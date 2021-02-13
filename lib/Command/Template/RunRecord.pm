@@ -1,4 +1,9 @@
 package Command::Template::RunRecord;
+use 5.024000;
+use warnings;
+use experimental qw< signatures >;
+no warnings qw< experimental::signatures >;
+{ our $VERSION = '0.001' }
 
 sub command           ($self) { $self->{command} }
 sub command_as_string ($self) { join ' ', @{$self->command} }

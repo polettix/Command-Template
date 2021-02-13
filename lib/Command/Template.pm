@@ -1,6 +1,13 @@
 package Command::Template;
-use strict;
+
+# vim: ts=3 sts=3 sw=3 et ai :
+
+use 5.024000;
 use warnings;
+use experimental qw< signatures >;
+no warnings qw< experimental::signatures >;
+{ our $VERSION = '0.001' }
+
 use Exporter 'import';
 our @EXPORT_OK = qw< command_runner command_template cr ct >;
 
@@ -46,15 +53,12 @@ sub _parse_command {
    return \@command;
 } ## end sub _parse_command
 
-sub _create {
-   my $class  = _class(shift(@_));
-   my $object = bless shift(@_), $class;
-   $object->{command} = _parse_command(@_);
-   return $object;
+sub _create ($class, $object, @command) {
+   $object->{command} = _parse_command(@command);
+   return bless $object, _class($class);
 } ## end sub _create
 
-sub _class {
-   my ($class) = @_;
+sub _class ($class) {
    (my $path = "$class.pm") =~ s{::}{/}gmxs;
    require $path;
    return $class;
