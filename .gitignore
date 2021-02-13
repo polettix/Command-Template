@@ -3,3 +3,5 @@
 /tmp/
 /dibs/
 /.build/
+/Command-Template-*.tar.gz
+/Command-Template-*/
