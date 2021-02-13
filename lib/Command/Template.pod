@@ -39,7 +39,28 @@ This document describes Command::Template version {{[ version ]}}.
 
 =head1 SYNOPSIS
 
-   use Command::Template;
+   use Command::Template qw< command_template command_runner >;
+
+   # command_template is aliased to ct
+   my $ct = command_template(qw{ ls [options:-l] <dir> });
+
+   # @c = qw< ls -l / >
+   @c = $ct->command(dir => '/');
+
+   # @c = qw< ls -la / >
+   @c = $ct->command(dir => '/etc', options => '-la');
+
+   # @c = qw< ls /usr/bin >
+   @c = $ct->command(dir => '/usr/bin', options => undef);
+   @c = $ct->command(dir => '/usr/bin', options => []);
+
+   # @c = qw< ls -l -a /usr/bin >
+   @c = $ct->command(dir => '/usr/bin', options => [qw< -l -a >]);
+
+
+   # command_runner is aliased to cr
+   my $runner = command_runner(qw{ ls [options:-l] <dir> });
+
 
 
 =head1 DESCRIPTION
