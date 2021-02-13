@@ -1,7 +1,15 @@
 #!/usr/bin/env perl
 my ($channel, $exit, @stuff) = @ARGV;
 my $fh = $channel eq 'stderr' ? \*STDERR : \*STDOUT;
-print {$fh} "@stuff\n" if @stuff;
+if (@stuff) {
+   if ($stuff[0] eq '-') {
+      my $everything = do { local $/; <STDIN> };
+      print {$fh} $everything;
+   }
+   else {
+      print {$fh} "@stuff";
+   }
+}
 kill -$exit, $$ if ($exit < 0);
 exit $exit;
 __END__

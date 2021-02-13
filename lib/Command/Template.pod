@@ -42,7 +42,7 @@ This document describes Command::Template version {{[ version ]}}.
    use Command::Template qw< command_template command_runner >;
 
    # command_template is aliased to ct
-   my $ct = command_template(qw{ ls [options:-l] <dir> });
+   my $ct = command_template(qw{ ls [options=-l] <dir> });
 
    # @c = qw< ls -l / >
    @c = $ct->command(dir => '/');

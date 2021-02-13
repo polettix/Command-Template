@@ -35,7 +35,7 @@ sub __ipc_run ($command, %options) {
    };
 }
 
-sub _handler ($self, $field, $new) {
+sub _handler ($self, $field, $new = undef) {
    return $self->{$field} unless defined $new;
    $self->{$field} = $new;
    return $self;
