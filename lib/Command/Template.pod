@@ -9,7 +9,6 @@
 
 Command::Template - A template to build command line arrays, and run them
 
-
 =head1 VERSION
 
 This document describes Command::Template version {{[ version ]}}.
@@ -41,6 +40,7 @@ This document describes Command::Template version {{[ version ]}}.
 
    use Command::Template qw< command_template command_runner >;
 
+   #### COMMAND EXPANSION GENERATION (NO EXECUTION) ####
    # command_template is aliased to ct
    my $ct = command_template(qw{ ls [options=-l] <dir> });
 
@@ -58,25 +58,165 @@ This document describes Command::Template version {{[ version ]}}.
    @c = $ct->command(dir => '/usr/bin', options => [qw< -l -a >]);
 
 
+   #### COMMAND RUNNING (VIA IPC::Run) ####
    # command_runner is aliased to cr
-   my $runner = command_runner(qw{ ls [options:-l] <dir> });
+   my $runner = command_runner(qw{ ls [options=-l] <dir> });
 
+   # run command qw< ls -l / >, returns a Command::Template::RunRecord
+   my $r = $runner->run(dir => '/');
+   my $run_successful  = $r->success;
+   my $exit_code       = $r->exit_code; # 0 is OK as usual in UNIX
+   my $received_signal = $r->signal;    # e.g. if killed, ...
+   my $stdout          = $r->stdout;
+   my $stderr          = $r->stderr;
+   my $merged          = $r->merged; # stderr then stdout, no newlines
+                                     # added
+
+   # command_runner is aliased to cr
+   my $other_runner = cr(qw< cat >); # gives stdin as stdout
+   my $message = "blah\nblah";
+   $r = $other_runner->run(-stdin => $message);
+   my $equal = $r->stdout eq $message; # true
 
 
 =head1 DESCRIPTION
 
-Yadda
+C<Command::Template> eases the creation of objects that help building up
+command-lines.
+
+As an example, you might want to generate multiple commands according to
+the following template:
+
+   ls [options=-l] <dir>
+
+i.e. the C<ls> command, where there might be some C<options> (defaulting
+to option C<-l>) and there MUST be a directory C<dir> (which in this
+case has no default).
+
+The following possible expansions adhere to the template above:
+
+   ls -l /
+   ls -la /usr
+   ls -l -a /etc
+   ls /run
+
+while the following does not (because there is no directory, which we
+want because we used the C<< <...> >> form):
+
+   ls -l
+
+The module provides two different interfaces:
+
+=over
+
+=item *
+
+L</command_template> allows generating the commands as lists, which are
+then supposed to be used somehow (e.g. provided to C<system>);
+
+=item *
+
+L</command_runner> allows running the commands via L<IPC::Run>.
+
+=back
+
+Both adhere to the same L</Expansion Rules> explained below.
+
+=head2 Expansion Rules
+
+A template in C<Command::Template> resembles the way commands are
+explained in documentation:
+
+=over
+
+=item *
+
+required parameters are enclosed by C<< <...> >> delimiters;
+
+=item *
+
+optional parameters are enclosed by C<< [...] >> delimiters.
+
+=back
+
+Parameters name can only start with a letter or an underscore, then can
+be followed by any sequence of underscores, letters, and digits. The
+following names are valid:
+
+   foo
+   bar
+   dir
+   baz1
+   baz_2
+   name_or_surname
+
+Any parameter can be optionally set with a default value, which can be
+set with the C<=> sign, like in the following examples:
+
+   <foo=this is FOO>
+   <bar=  BAR  >
+
+Spaces are preserved starting immediately after the C<=> sign.
+
+When a template is expanded, it is done using a hash that maps each name
+to the value it should take:
+
+=over
+
+=item *
+
+if C<undef>, then the corresponding item is I<removed> from the command.
+This allows getting rid of a default value set for an optional
+parameter; it is an error (leading to an exception) if the parameter is
+required;
+
+=item *
+
+if any other plain scalar, it is set as the value in the specific
+command line parameter location;
+
+=item *
+
+if an array reference, all items inside are put in the specific command
+line parameter location.
+
+=back
+
+The last possibility provides the flexibility to e.g. set options that
+require a parameter (e.g. it would be the case of option C<-name> for
+command C<find>).
+
+This actual expansion is performed by module
+L<Command::Template::Instance> (and any other module relying on it).
+
 
 =head1 INTERFACE
 
-=head2 B<< foo >>
+=head2 B<< command_runner >>
 
-   my $foo = foo(qw< bar baz >);
+   my $cr = command_runner(qw{ galook <foo> <bar=N> [baz] [sil=Y] })
+
+Returns a L<Command::Template::Runner> object with a C<run> method.
+
+=head2 B<< cr >>
+
+Alias for L</command_runner>.
+
+=head2 B<< command_template >>
+
+   my $ct = command_template(qw{ galook <foo> <bar=N> [baz] [sil=Y] })
+
+Returns a L<Command::Template::Instance> object with a C<command> method
+that performs the actual expansion.
+
+=head2 B<< ct >>
+
+Alias for L</command_template>.
 
 
 =head1 BUGS AND LIMITATIONS
 
-Minimul perl version 5.24.
+Minimum perl version 5.24.
 
 Report bugs through GitHub (patches welcome) at
 L<https://github.com/polettix/Command-Template>.

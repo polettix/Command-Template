@@ -29,21 +29,152 @@ This document describes Command::Template version {{\[ version \]}}.
 
 # SYNOPSIS
 
-    use Command::Template;
+    use Command::Template qw< command_template command_runner >;
+
+    #### COMMAND EXPANSION GENERATION (NO EXECUTION) ####
+    # command_template is aliased to ct
+    my $ct = command_template(qw{ ls [options=-l] <dir> });
+
+    # @c = qw< ls -l / >
+    @c = $ct->command(dir => '/');
+
+    # @c = qw< ls -la / >
+    @c = $ct->command(dir => '/etc', options => '-la');
+
+    # @c = qw< ls /usr/bin >
+    @c = $ct->command(dir => '/usr/bin', options => undef);
+    @c = $ct->command(dir => '/usr/bin', options => []);
+
+    # @c = qw< ls -l -a /usr/bin >
+    @c = $ct->command(dir => '/usr/bin', options => [qw< -l -a >]);
+
+
+    #### COMMAND RUNNING (VIA IPC::Run) ####
+    # command_runner is aliased to cr
+    my $runner = command_runner(qw{ ls [options=-l] <dir> });
+
+    # run command qw< ls -l / >, returns a Command::Template::RunRecord
+    my $r = $runner->run(dir => '/');
+    my $run_successful  = $r->success;
+    my $exit_code       = $r->exit_code; # 0 is OK as usual in UNIX
+    my $received_signal = $r->signal;    # e.g. if killed, ...
+    my $stdout          = $r->stdout;
+    my $stderr          = $r->stderr;
+    my $merged          = $r->merged; # stderr then stdout, no newlines
+                                      # added
+
+    # command_runner is aliased to cr
+    my $other_runner = cr(qw< cat >); # gives stdin as stdout
+    my $message = "blah\nblah";
+    $r = $other_runner->run(-stdin => $message);
+    my $equal = $r->stdout eq $message; # true
 
 # DESCRIPTION
 
-Yadda
+`Command::Template` eases the creation of objects that help building up
+command-lines.
+
+As an example, you might want to generate multiple commands according to
+the following template:
+
+    ls [options=-l] <dir>
+
+i.e. the `ls` command, where there might be some `options` (defaulting
+to option `-l`) and there MUST be a directory `dir` (which in this
+case has no default).
+
+The following possible expansions adhere to the template above:
+
+    ls -l /
+    ls -la /usr
+    ls -l -a /etc
+    ls /run
+
+while the following does not (because there is no directory, which we
+want because we used the `<...>` form):
+
+    ls -l
+
+The module provides two different interfaces:
+
+- ["command\_template"](#command_template) allows generating the commands as lists, which are
+then supposed to be used somehow (e.g. provided to `system`);
+- ["command\_runner"](#command_runner) allows running the commands via [IPC::Run](https://metacpan.org/pod/IPC::Run).
+
+Both adhere to the same ["Expansion Rules"](#expansion-rules) explained below.
+
+## Expansion Rules
+
+A template in `Command::Template` resembles the way commands are
+explained in documentation:
+
+- required parameters are enclosed by `<...>` delimiters;
+- optional parameters are enclosed by `[...]` delimiters.
+
+Parameters name can only start with a letter or an underscore, then can
+be followed by any sequence of underscores, letters, and digits. The
+following names are valid:
+
+    foo
+    bar
+    dir
+    baz1
+    baz_2
+    name_or_surname
+
+Any parameter can be optionally set with a default value, which can be
+set with the `=` sign, like in the following examples:
+
+    <foo=this is FOO>
+    <bar=  BAR  >
+
+Spaces are preserved starting immediately after the `=` sign.
+
+When a template is expanded, it is done using a hash that maps each name
+to the value it should take:
+
+- if `undef`, then the corresponding item is _removed_ from the command.
+This allows getting rid of a default value set for an optional
+parameter; it is an error (leading to an exception) if the parameter is
+required;
+- if any other plain scalar, it is set as the value in the specific
+command line parameter location;
+- if an array reference, all items inside are put in the specific command
+line parameter location.
+
+The last possibility provides the flexibility to e.g. set options that
+require a parameter (e.g. it would be the case of option `-name` for
+command `find`).
+
+This actual expansion is performed by module
+[Command::Template::Instance](https://metacpan.org/pod/Command::Template::Instance) (and any other module relying on it).
 
 # INTERFACE
 
-## **foo**
+## **command\_runner**
 
-    my $foo = foo(qw< bar baz >);
+    my $cr = command_runner(qw{ galook <foo> <bar=N> [baz] [sil=Y] })
+
+Returns a [Command::Template::Runner](https://metacpan.org/pod/Command::Template::Runner) object with a `run` method.
+
+## **cr**
+
+Alias for ["command\_runner"](#command_runner).
+
+## **command\_template**
+
+    my $ct = command_template(qw{ galook <foo> <bar=N> [baz] [sil=Y] })
+
+Returns a [Command::Template::Instance](https://metacpan.org/pod/Command::Template::Instance) object with a `command` method
+that performs the actual expansion.
+
+## **ct**
+
+Alias for ["command\_template"](#command_template).
 
 # BUGS AND LIMITATIONS
 
-Minimul perl version 5.24.
+Minimum perl version 5.24.
 
 Report bugs through GitHub (patches welcome) at
 [https://github.com/polettix/Command-Template](https://github.com/polettix/Command-Template).
