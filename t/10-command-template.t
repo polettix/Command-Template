@@ -51,7 +51,7 @@ for my $test (
    ],
 ) {
    my ($bindings, $expected, $message) = @$test;
-   my $got = $ct->command(%$bindings);
+   my $got = $ct->generate(%$bindings);
    is_deeply $got, $expected, $message;
 }
 

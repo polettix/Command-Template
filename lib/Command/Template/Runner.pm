@@ -5,11 +5,19 @@ use experimental qw< signatures >;
 no warnings qw< experimental::signatures >;
 { our $VERSION = '0.001' }
 
-use Command::Template::RunRecord;
+use Storable 'dclone';
+use Command::Template::Runner::Record;
+
+# attributes
+sub instance ($self) { $self->{instance} }
+sub last_run ($self) { $self->{last_run} }
+sub options ($self, @new) {
+   return dclone($self->{options}) unless @new;
+   $self->{options} = $new[0];
+   return $self;
+}
+
 use IPC::Run ();
-
-sub last_run ($self) { return $self->{last_run} }
-
 sub __ipc_run ($command, %options) {
    my $in = $options{stdin} // '';
    my $out = '';
@@ -35,16 +43,10 @@ sub __ipc_run ($command, %options) {
    };
 }
 
-sub _handler ($self, $field, $new = undef) {
-   return $self->{$field} unless defined $new;
-   $self->{$field} = $new;
-   return $self;
-}
-
-sub options ($self, @rest) { $self->_handler(options => @rest) }
+sub new ($p, $i) { return bless { instance => $i, options => {} }, $p }
 
 sub run ($self, %bindopts) {
-   my (%bindings, %options);
+   my (%bindings, %options); # split %bindopts into these hashes
    while (my ($key, $value) = each %bindopts) {
       if (substr($key, 0, 1) eq '-') {
          $options{substr $key, 1} = $value;
@@ -53,13 +55,11 @@ sub run ($self, %bindopts) {
          $bindings{$key} = $value;
       }
    }
-   my $command = $self->{template}->command(%bindings);
+   my $cmd = $self->instance->generate(%bindings);
    %options = (%{$self->options}, %options);
-   my $retval = $self->{last_run} =
-      bless __ipc_run($command, %options), 'Command::Template::RunRecord';
-   return $retval;
+   my $run = $self->{last_run}
+      = Command::Template::Runner::Record->new(__ipc_run($cmd, %options));
+   return $run;
 }
-
-sub template ($self, @rest) { $self->_handler(template => @rest) }
 
 1;

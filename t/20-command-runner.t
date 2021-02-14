@@ -9,7 +9,7 @@ my $sparring = path(__FILE__)->parent->child('sparring')->stringify;
 my $cr = cr($sparring, qw{ <channel=stdout> <exit=0> [message=hello] });
 
 my $r = $cr->run();
-isa_ok $r, 'Command::Template::RunRecord';
+isa_ok $r, 'Command::Template::Runner::Record';
 
 can_ok $r, qw<
    command
