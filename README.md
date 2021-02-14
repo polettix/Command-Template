@@ -29,24 +29,24 @@ This document describes Command::Template version {{\[ version \]}}.
 
 # SYNOPSIS
 
-    use Command::Template qw< command_template command_runner >;
+    use Command::Template qw< command_runner command_template cr ct >;
 
     #### COMMAND EXPANSION GENERATION (NO EXECUTION) ####
     # command_template is aliased to ct
     my $ct = command_template(qw{ ls [options=-l] <dir> });
 
-    # @c = qw< ls -l / >
-    @c = $ct->command(dir => '/');
+    # @c1 = qw< ls -l / >
+    my @c1 = $ct->generate(dir => '/');
 
-    # @c = qw< ls -la / >
-    @c = $ct->command(dir => '/etc', options => '-la');
+    # @c2 = qw< ls -la / >
+    my @c2 = $ct->generate(dir => '/etc', options => '-la');
 
-    # @c = qw< ls /usr/bin >
-    @c = $ct->command(dir => '/usr/bin', options => undef);
-    @c = $ct->command(dir => '/usr/bin', options => []);
+    # @c3 = @c4 = qw< ls /usr/bin >
+    my @c3 = $ct->generate(dir => '/usr/bin', options => undef);
+    my @c4 = $ct->generate(dir => '/usr/bin', options => []);
 
-    # @c = qw< ls -l -a /usr/bin >
-    @c = $ct->command(dir => '/usr/bin', options => [qw< -l -a >]);
+    # @c5 = qw< ls -l -a /usr/bin >
+    my @c5 = $ct->generate(dir => '/usr/bin', options => [qw< -l -a >]);
 
 
     #### COMMAND RUNNING (VIA IPC::Run) ####
@@ -72,10 +72,10 @@ This document describes Command::Template version {{\[ version \]}}.
 # DESCRIPTION
 
 `Command::Template` eases the creation of objects that help building up
-command-lines.
+command-lines and/or to run them.
 
-As an example, you might want to generate multiple commands according to
-the following template:
+As an example, it might be needed to generate multiple commands
+according to the following template:
 
     ls [options=-l] <dir>
 
@@ -101,7 +101,8 @@ The module provides two different interfaces:
 then supposed to be used somehow (e.g. provided to `system`);
 - ["command\_runner"](#command_runner) allows running the commands via [IPC::Run](https://metacpan.org/pod/IPC::Run).
 
-Both adhere to the same ["Expansion Rules"](#expansion-rules) explained below.
+Both adhere to the same ["Expansion Rules"](#expansion-rules) explained below and
+implemented in [Command::Template::Instance](https://metacpan.org/pod/Command::Template::Instance).
 
 ## Expansion Rules
 
@@ -130,8 +131,8 @@ set with the `=` sign, like in the following examples:
 
 Spaces are preserved starting immediately after the `=` sign.
 
-When a template is expanded, it is done using a hash that maps each name
-to the value it should take:
+When [Template::Command::Instance](https://metacpan.org/pod/Template::Command::Instance) expands a template, it uses a hash
+that maps each name to the value it should take:
 
 - if `undef`, then the corresponding item is _removed_ from the command.
 This allows getting rid of a default value set for an optional
@@ -146,16 +147,31 @@ The last possibility provides the flexibility to e.g. set options that
 require a parameter (e.g. it would be the case of option `-name` for
 command `find`).
 
-This actual expansion is performed by module
-[Command::Template::Instance](https://metacpan.org/pod/Command::Template::Instance) (and any other module relying on it).
+## Running Commands
+
+While [Command::Template::Instance](https://metacpan.org/pod/Command::Template::Instance) only allows generating command
+lines as lists of strings, [Command::Template::Runner](https://metacpan.org/pod/Command::Template::Runner) allows running
+them by means of [IPC::Run](https://metacpan.org/pod/IPC::Run).
+
+All the heavy work for expanding is provided by
+[Command::Template::Instance](https://metacpan.org/pod/Command::Template::Instance) behind the scenes; the ["SYNOPSIS"](#synopsis)
+contains examples of actual running of commands.
 
 # INTERFACE
 
 ## **command\_runner**
 
-    my $cr = command_runner(qw{ galook <foo> <bar=N> [baz] [sil=Y] })
+    # parse a command line template and use it for running commands
+    my $cr = command_runner(qw{ ls [options=-l] <dir> });
 
-Returns a [Command::Template::Runner](https://metacpan.org/pod/Command::Template::Runner) object with a `run` method.
+Returns a [Command::Template::Runner](https://metacpan.org/pod/Command::Template::Runner) object with a `run` method that
+allows actually running generated commands via [IPC::Run](https://metacpan.org/pod/IPC::Run).
+
+Each run returns a [Command::Template::Runner::Record](https://metacpan.org/pod/Command::Template::Runner::Record) object that allows
+peeking into the actual result of the run.
+
+    my $r = $cr->run(options => '-la', '/etc');
+    say $r->stdout if $r->success;
 
 ## **cr**
 
@@ -165,12 +181,38 @@ Alias for ["command\_runner"](#command_runner).
 
     my $ct = command_template(qw{ galook <foo> <bar=N> [baz] [sil=Y] })
 
-Returns a [Command::Template::Instance](https://metacpan.org/pod/Command::Template::Instance) object with a `command` method
-that performs the actual expansion.
+Returns a [Command::Template::Instance](https://metacpan.org/pod/Command::Template::Instance) object with a `generate`
+method that performs the actual expansion, returning a list of strings
+representing the command line.
 
 ## **ct**
 
 Alias for ["command\_template"](#command_template).
+
+# EXTENDING
+
+If extending `Command::Template` is of interest, here are a few hints:
+
+- class [Command::Template::Instance](https://metacpan.org/pod/Command::Template::Instance) encapsulates parsing a command
+template and expanding it for generating command lists, based on a hash
+with values binding;
+- class [Command::Template::Runner](https://metacpan.org/pod/Command::Template::Runner) provides a simple running facility
+around [Command::Template::Instance](https://metacpan.org/pod/Command::Template::Instance) that uses [IPC::Run](https://metacpan.org/pod/IPC::Run) to run
+expanded commands, returning the result as a
+[Command::Template::Runner::Record](https://metacpan.org/pod/Command::Template::Runner::Record) object.
+- class [Command::Template::Runner::Record](https://metacpan.org/pod/Command::Template::Runner::Record) provides accessors into the
+outcome of a single run from [Command::Template::Runner](https://metacpan.org/pod/Command::Template::Runner).
+
+Possible reasons for expanding might be:
+
+- different or additional rules for expansions are needed. If this is the
+case, the alternative to [Command::Template::Instance](https://metacpan.org/pod/Command::Template::Instance) must provide a
+`generate` method; [Comman::Template::Runner](https://metacpan.org/pod/Comman::Template::Runner) can still be used, as
+long as a reference to the alternative object for the instance is passed
+to the constructor.
+- a different running facility is needed. In this case, it suffices to
+impelement a new runner class, leveraging [Command::Template::Instance](https://metacpan.org/pod/Command::Template::Instance)
+for the command expansion.
 
 # BUGS AND LIMITATIONS
 
